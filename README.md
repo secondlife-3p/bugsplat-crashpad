@@ -117,7 +117,9 @@ The application will crash immediately upon launch to demonstrate the crash repo
 
 This project supports uploading debug symbols to BugSplat for improved crash reporting. The symbol upload process uses the official BugSplat symbol-upload utility, which is automatically downloaded as needed.
 
-> **Note:** Before uploading symbols, make sure you've configured your BugSplat database name in `main.h` as described in the [BugSplat Setup](#bugsplat-setup) section.
+> **Note:** Before uploading symbols, ensure you have:
+> 1. Configured your BugSplat database name in `main.h` as described in the [BugSplat Setup](#bugsplat-setup) section
+> 2. Set up your BugSplat API credentials (`BUGSPLAT_CLIENT_ID` and `BUGSPLAT_CLIENT_SECRET`) in the `.env` file. You can find these in your BugSplat account settings under "API Keys"
 
 ### Using the Symbol Upload Scripts
 
@@ -135,30 +137,6 @@ This project supports uploading debug symbols to BugSplat for improved crash rep
    ```powershell
    # For Windows
    .\scripts\upload_symbols.ps1
-   ```
-
-### Using CMake Custom Target
-
-You can also use the CMake custom target:
-
-1. Source the environment variables before running CMake:
-   ```bash
-   # For Linux/macOS
-   source .env && cmake -B build
-   ```
-   ```powershell
-   # For Windows
-   Get-Content .env | ForEach-Object { 
-       if ($_ -match '(.+)=(.+)') { 
-           Set-Item -Path "Env:$($matches[1])" -Value $matches[2]
-       }
-   }
-   cmake -B build
-   ```
-
-2. Upload symbols with the custom target:
-   ```bash
-   cmake --build build --target upload_symbols
    ```
 
 ### How It Works
