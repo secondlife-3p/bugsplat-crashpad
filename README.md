@@ -2,20 +2,33 @@
 
 A cross-platform application demonstrating Crashpad integration with CMake.
 
-## About
+## About ℹ️
 
 This project demonstrates how to:
 - Set up a CMake project for cross-platform development
 - Integrate Google's Crashpad library for crash reporting
 - Create a simple crashing application that generates crash reports
 
-## Prerequisites
+## Prerequisites ☑️
 
 - CMake (version 3.10 or higher)
 - A C++ compiler (gcc, clang, MSVC, etc.)
 - [depot_tools](https://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html#_setting_up) - Google's tools for working with Chromium source code
 - Ninja - part of depot_tools
 - GN (Generate Ninja) - part of depot_tools
+- A BugSplat account and database (sign up at [bugsplat.com](https://www.bugsplat.com))
+
+## Configuration ⚙️
+
+### BugSplat Setup
+
+1. Sign up for a BugSplat account at [bugsplat.com](https://www.bugsplat.com) if you haven't already
+2. Create a new database in your BugSplat dashboard
+3. Open `main.h` and define your database name:
+   ```cpp
+   #define BUGSPLAT_DATABASE "your-database-name"  // Replace with your database name from BugSplat
+   ```
+   The database name can be found in your BugSplat dashboard URL: `https://app.bugsplat.com/v2/database/{database-name}`
 
 ### Installing depot_tools
 
@@ -45,7 +58,7 @@ $env:Path += ";C:\path\to\depot_tools"
 gclient
 ```
 
-## Building the Project
+## Building the Project 🏗️
 
 The build scripts will automatically fetch and build Crashpad using depot_tools, then build the main application using CMake.
 
@@ -79,11 +92,11 @@ The build scripts will automatically fetch and build Crashpad using depot_tools,
 .\build\Debug\MyCMakeCrasher.exe
 ```
 
-## Testing Crash Reporting
+## Testing Crash Reporting 🧪
 
 The application will crash immediately upon launch to demonstrate the crash reporting functionality. The crash reports will be stored in the `crashes` directory where you run the application.
 
-## Project Structure
+## Project Structure 🗺️
 
 - `main.cpp`: Main source file with Crashpad integration
 - `main.h`: Header file with configuration defines
@@ -100,9 +113,11 @@ The application will crash immediately upon launch to demonstrate the crash repo
   - `upload_symbols.ps1`: Symbol upload script for Windows
 - `third_party/`: Directory where Crashpad will be fetched and built 
 
-## Symbol Uploads
+## Symbol Uploads 📤
 
 This project supports uploading debug symbols to BugSplat for improved crash reporting. The symbol upload process uses the official BugSplat symbol-upload utility, which is automatically downloaded as needed.
+
+> **Note:** Before uploading symbols, make sure you've configured your BugSplat database name in `main.h` as described in the [BugSplat Setup](#bugsplat-setup) section.
 
 ### Using the Symbol Upload Scripts
 
@@ -158,4 +173,4 @@ You can also use the CMake custom target:
 - The symbol upload feature uses the values defined in `main.h` for database, application name, and version
 - Symbol files are platform-specific (.pdb for Windows, .dSYM for macOS, and .debug for Linux)
 - Upload will be skipped if credentials are not provided
-- Credentials are never stored in your source code 
+- Credentials are never stored in your source code

@@ -4,7 +4,12 @@
 #include <string>
 
 // BugSplat Configuration
-#define BUGSPLAT_DATABASE "fred"
+// Replace BUGSPLAT_DATABASE with your database name from your BugSplat dashboard
+#ifndef BUGSPLAT_DATABASE
+#error "BUGSPLAT_DATABASE must be defined. Please set it to your database name from your BugSplat dashboard."
+#endif
+
+// Application name and version
 #define BUGSPLAT_APP_NAME "MyCMakeCrasher"
 #define BUGSPLAT_APP_VERSION "1.0"
 
