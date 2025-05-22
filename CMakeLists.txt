@@ -199,39 +199,21 @@ if(BUGSPLAT_CLIENT_ID AND BUGSPLAT_CLIENT_SECRET)
   if(WIN32)
     add_custom_target(upload_symbols
       COMMAND powershell -ExecutionPolicy Bypass -File 
-              ${CMAKE_CURRENT_SOURCE_DIR}/scripts/symbol_upload_windows.ps1
-              -database ${BUGSPLAT_DATABASE}
-              -appName ${BUGSPLAT_APP_NAME}
-              -version ${BUGSPLAT_APP_VERSION}
-              -symbolsDir ${CMAKE_CURRENT_BINARY_DIR}
-              -clientId ${BUGSPLAT_CLIENT_ID}
-              -clientSecret ${BUGSPLAT_CLIENT_SECRET}
+              ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.ps1
       DEPENDS MyCMakeCrasher
-      COMMENT "Uploading symbols to BugSplat using symbol-upload-windows"
+      COMMENT "Uploading symbols to BugSplat"
     )
   elseif(APPLE)
     add_custom_target(upload_symbols
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/symbol_upload_macos.sh
-              ${BUGSPLAT_DATABASE}
-              ${BUGSPLAT_APP_NAME}
-              ${BUGSPLAT_APP_VERSION}
-              ${CMAKE_CURRENT_BINARY_DIR}
-              ${BUGSPLAT_CLIENT_ID}
-              ${BUGSPLAT_CLIENT_SECRET}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.sh
       DEPENDS MyCMakeCrasher
-      COMMENT "Uploading symbols to BugSplat using symbol-upload-macos"
+      COMMENT "Uploading symbols to BugSplat"
     )
   else() # Linux
     add_custom_target(upload_symbols
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/symbol_upload_linux.sh
-              ${BUGSPLAT_DATABASE}
-              ${BUGSPLAT_APP_NAME}
-              ${BUGSPLAT_APP_VERSION}
-              ${CMAKE_CURRENT_BINARY_DIR}
-              ${BUGSPLAT_CLIENT_ID}
-              ${BUGSPLAT_CLIENT_SECRET}
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.sh
       DEPENDS MyCMakeCrasher
-      COMMENT "Uploading symbols to BugSplat using symbol-upload-linux"
+      COMMENT "Uploading symbols to BugSplat"
     )
   endif()
 endif() 

@@ -26,11 +26,6 @@ This project demonstrates how to:
 git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
 ```
 
-```cmd
-:: For Windows
-git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-```
-
 2. Add depot_tools to your PATH:
 
 ```bash
@@ -38,23 +33,21 @@ git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
 export PATH="$PATH:/path/to/depot_tools"
 ```
 
-```cmd
-:: For Windows - add to system environment variables or use:
-set PATH=%PATH%;C:\path\to\depot_tools
+```powershell
+# For Windows - add to system environment variables or use:
+$env:Path += ";C:\path\to\depot_tools"
 ```
 
 3. For Windows, you also need to run:
 
-```cmd
-:: From the depot_tools directory
+```powershell
+# From the depot_tools directory
 gclient
 ```
 
 ## Building the Project
 
 The build scripts will automatically fetch and build Crashpad using depot_tools, then build the main application using CMake.
-
-Note: The build scripts will upload symbols to BugSplat by default. Make sure you've set up your BugSplat credentials in a `.env` file as described in the Symbol Uploads section below.
 
 ### macOS
 
@@ -78,29 +71,12 @@ Note: The build scripts will upload symbols to BugSplat by default. Make sure yo
 
 ### Windows
 
-```cmd
+```powershell
 # Execute the build script
-scripts\build_windows_msvc.bat
+.\scripts\build_windows_msvc.ps1
 
 # Run the application
-build\Release\MyCMakeCrasher.exe
-```
-
-### Skipping Symbol Uploads
-
-If you want to skip symbol uploads during the build process, you can add the `--skip-symbols` parameter to any of the build scripts:
-
-```bash
-# For macOS
-./scripts/build_macos.sh --skip-symbols
-
-# For Linux
-./scripts/build_linux.sh --skip-symbols
-```
-
-```cmd
-:: For Windows
-scripts\build_windows_msvc.bat --skip-symbols
+.\build\Debug\MyCMakeCrasher.exe
 ```
 
 ## Testing Crash Reporting
@@ -116,19 +92,19 @@ The application is set up to crash when you press Enter. The crash reports will 
 - `scripts/`: Build scripts for different platforms
   - `build_macos.sh`: macOS build script
   - `build_linux.sh`: Linux build script
-  - `build_windows_msvc.bat`: Windows build script for MSVC
+  - `build_windows_msvc.ps1`: Windows build script for MSVC
   - `build_crashpad_macos.sh`: Script to fetch and build Crashpad on macOS
   - `build_crashpad_linux.sh`: Script to fetch and build Crashpad on Linux
-  - `build_crashpad_windows_msvc.bat`: Script to fetch and build Crashpad on Windows
+  - `build_crashpad_windows_msvc.ps1`: Script to fetch and build Crashpad on Windows
+  - `upload_symbols.sh`: Symbol upload script for macOS/Linux
+  - `upload_symbols.ps1`: Symbol upload script for Windows
 - `third_party/`: Directory where Crashpad will be fetched and built 
 
 ## Symbol Uploads
 
 This project supports uploading debug symbols to BugSplat for improved crash reporting. The symbol upload process uses the official BugSplat symbol-upload utility, which is automatically downloaded as needed.
 
-### Option 1: Using the Wrapper Scripts (Recommended)
-
-The simplest way to upload symbols is to use the wrapper scripts:
+### Using the Symbol Upload Scripts
 
 1. Copy `env.example` to `.env` and add your BugSplat credentials:
    ```
@@ -141,12 +117,12 @@ The simplest way to upload symbols is to use the wrapper scripts:
    # For Linux/macOS
    ./scripts/upload_symbols.sh
    ```
-   ```cmd
-   :: For Windows
-   scripts\upload_symbols.bat
+   ```powershell
+   # For Windows
+   .\scripts\upload_symbols.ps1
    ```
 
-### Option 2: Using CMake Custom Target
+### Using CMake Custom Target
 
 You can also use the CMake custom target:
 
@@ -155,9 +131,13 @@ You can also use the CMake custom target:
    # For Linux/macOS
    source .env && cmake -B build
    ```
-   ```cmd
-   :: For Windows
-   for /f "tokens=*" %i in (.env) do set %i
+   ```powershell
+   # For Windows
+   Get-Content .env | ForEach-Object { 
+       if ($_ -match '(.+)=(.+)') { 
+           Set-Item -Path "Env:$($matches[1])" -Value $matches[2]
+       }
+   }
    cmake -B build
    ```
 
@@ -169,13 +149,13 @@ You can also use the CMake custom target:
 ### How It Works
 
 - The scripts will automatically download the appropriate symbol-upload utility for your platform from BugSplat
-- Windows: Uses symbol-upload-windows.exe for uploading .pdb files
-- macOS: Uses symbol-upload-macos for uploading .dSYM files
-- Linux: Uses symbol-upload-linux for uploading debug symbols
+- Windows: Uses symbol-upload-windows.exe for uploading `**/*.pdb` files
+- macOS: Uses symbol-upload-macos for uploading `**/*.dSYM` files
+- Linux: Uses symbol-upload-linux for uploading `**/*.debug` files
 
 ### Notes on Symbol Uploads
 
 - The symbol upload feature uses the values defined in `main.h` for database, application name, and version
-- Symbol files are platform-specific (.pdb for Windows, .dSYM for macOS, and the executable for Linux)
+- Symbol files are platform-specific (.pdb for Windows, .dSYM for macOS, and .debug for Linux)
 - Upload will be skipped if credentials are not provided
 - Credentials are never stored in your source code 

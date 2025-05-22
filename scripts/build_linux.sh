@@ -1,13 +1,6 @@
 #!/bin/bash
 set -e
 
-# Check if symbol upload should be skipped
-UPLOAD_SYMBOLS=1
-if [ "$1" == "--skip-symbols" ]; then
-    UPLOAD_SYMBOLS=0
-    echo "Symbol uploads will be skipped"
-fi
-
 # Check if depot_tools is in PATH
 if ! command -v fetch &> /dev/null; then
     echo "ERROR: depot_tools not found in PATH"
@@ -32,12 +25,5 @@ make
 
 echo "Build complete. Run the application with: ./MyCMakeCrasher"
 
-# Upload symbols by default unless skipped
-if [ $UPLOAD_SYMBOLS -eq 1 ]; then
-    echo "Uploading symbols..."
-    cd ..
-    ./scripts/upload_symbols.sh
-else
-    echo "Symbol uploads skipped."
-    cd ..
-fi 
+# Return to root directory
+cd .. 
