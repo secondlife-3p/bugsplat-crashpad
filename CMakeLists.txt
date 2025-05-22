@@ -4,11 +4,234 @@ cmake_minimum_required(VERSION 3.10)
 project(MyCMakeCrasher VERSION 1.0)
 
 # Specify the C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Ensure debug symbols are generated
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # Debug symbol flags for all platforms
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+  
+  # Platform-specific debug symbol settings
+  if(MSVC)
+    # Visual Studio generates PDB files by default in Debug mode
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+endif()
+
+# Extract configuration values from main.h for symbol uploads
+file(STRINGS "main.h" MAIN_H_CONTENTS)
+foreach(LINE ${MAIN_H_CONTENTS})
+  if(LINE MATCHES "^#define BUGSPLAT_DATABASE \"(.*)\"")
+    set(BUGSPLAT_DATABASE "${CMAKE_MATCH_1}")
+  elseif(LINE MATCHES "^#define BUGSPLAT_APP_NAME \"(.*)\"")
+    set(BUGSPLAT_APP_NAME "${CMAKE_MATCH_1}")
+  elseif(LINE MATCHES "^#define BUGSPLAT_APP_VERSION \"(.*)\"")
+    set(BUGSPLAT_APP_VERSION "${CMAKE_MATCH_1}")
+  endif()
+endforeach()
+
+# For sensitive values, check environment first, then allow manual override
+if(DEFINED ENV{BUGSPLAT_CLIENT_ID})
+  set(BUGSPLAT_CLIENT_ID $ENV{BUGSPLAT_CLIENT_ID} CACHE STRING "BugSplat client ID")
+else()
+  set(BUGSPLAT_CLIENT_ID "" CACHE STRING "BugSplat client ID")
+endif()
+
+if(DEFINED ENV{BUGSPLAT_CLIENT_SECRET})
+  set(BUGSPLAT_CLIENT_SECRET $ENV{BUGSPLAT_CLIENT_SECRET} CACHE STRING "BugSplat client secret")
+else()
+  set(BUGSPLAT_CLIENT_SECRET "" CACHE STRING "BugSplat client secret")
+endif()
+
+# Print configuration status for clarity
+message(STATUS "Building ${BUGSPLAT_APP_NAME} version ${BUGSPLAT_APP_VERSION} for database ${BUGSPLAT_DATABASE}")
+if(BUGSPLAT_CLIENT_ID AND BUGSPLAT_CLIENT_SECRET)
+  message(STATUS "BugSplat credentials found - symbol upload available")
+else()
+  message(STATUS "BugSplat credentials not found - symbol upload will be disabled")
+endif()
+
+# Set Crashpad paths
+set(CRASHPAD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/crashpad)
+
+# Set platform-specific build output directory for Crashpad
+if(WIN32)
+    set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/win)
+elseif(APPLE)
+    set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/macos)
+elseif(UNIX)
+    set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/linux)
+endif()
+
+# Add Crashpad include directories
+include_directories(
+    ${CRASHPAD_ROOT}
+    ${CRASHPAD_ROOT}/third_party/mini_chromium/mini_chromium
+)
+
+# Set up platform-specific libraries
+if(WIN32)
+    set(CRASHPAD_LIBRARIES
+        ${CRASHPAD_OUT_DIR}/obj/client/client.lib
+        ${CRASHPAD_OUT_DIR}/obj/client/libcommon.lib
+        ${CRASHPAD_OUT_DIR}/obj/util/util.lib
+        ${CRASHPAD_OUT_DIR}/obj/third_party/mini_chromium/mini_chromium/base/base.lib
+    )
+    set(CRASHPAD_HANDLER ${CRASHPAD_OUT_DIR}/crashpad_handler.exe)
+elseif(APPLE)
+    set(CRASHPAD_LIBRARIES
+        ${CRASHPAD_OUT_DIR}/obj/client/libclient.a
+        ${CRASHPAD_OUT_DIR}/obj/client/libcommon.a
+        ${CRASHPAD_OUT_DIR}/obj/util/libutil.a
+        ${CRASHPAD_OUT_DIR}/obj/util/libmig_output.a
+        ${CRASHPAD_OUT_DIR}/obj/third_party/mini_chromium/mini_chromium/base/libbase.a
+    )
+    set(CRASHPAD_HANDLER ${CRASHPAD_OUT_DIR}/crashpad_handler)
+else() # Linux
+    set(CRASHPAD_LIBRARIES
+        ${CRASHPAD_OUT_DIR}/obj/client/libclient.a
+        ${CRASHPAD_OUT_DIR}/obj/client/libcommon.a
+        ${CRASHPAD_OUT_DIR}/obj/util/libutil.a
+        ${CRASHPAD_OUT_DIR}/obj/third_party/mini_chromium/mini_chromium/base/libbase.a
+    )
+    set(CRASHPAD_HANDLER ${CRASHPAD_OUT_DIR}/crashpad_handler)
+endif()
+
+# Build the crash library
+if(WIN32)
+    add_library(crash SHARED crash.cpp crash.h)
+    set_target_properties(crash PROPERTIES OUTPUT_NAME "crash")
+elseif(APPLE)
+    add_library(crash SHARED crash.cpp crash.h)
+    set_target_properties(crash PROPERTIES OUTPUT_NAME "crash")
+else() # Linux
+    add_library(crash SHARED crash.cpp crash.h)
+    set_target_properties(crash PROPERTIES 
+        OUTPUT_NAME "crash" 
+        VERSION 2.0.0 
+        SOVERSION 2)
+endif()
 
 # Add executable
 add_executable(MyCMakeCrasher main.cpp)
 
-# Install target
-install(TARGETS MyCMakeCrasher DESTINATION bin) 
+# Platform-specific libraries and link order
+if(APPLE)
+    target_link_libraries(MyCMakeCrasher
+        "-framework Foundation"
+        "-framework CoreFoundation"
+        "-framework CoreGraphics"
+        "-framework CoreText"
+        "-framework Security"
+        "-framework IOKit"
+        "-framework CoreServices"
+        "-framework SystemConfiguration"
+        bsm
+        ${CRASHPAD_LIBRARIES}
+    )
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(MyCMakeCrasher
+        ${CRASHPAD_LIBRARIES}
+        pthread
+        dl
+        stdc++fs
+    )
+else()
+    target_link_libraries(MyCMakeCrasher ${CRASHPAD_LIBRARIES})
+endif()
+
+# Copy crashpad_handler to the build directory
+add_custom_command(TARGET MyCMakeCrasher POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CRASHPAD_HANDLER}
+    ${CMAKE_CURRENT_BINARY_DIR}/crashpad_handler${CMAKE_EXECUTABLE_SUFFIX}
+)
+
+# Create attachment.txt in the build directory
+add_custom_command(TARGET MyCMakeCrasher POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "BugSplat rocks!" > ${CMAKE_CURRENT_BINARY_DIR}/attachment.txt
+)
+
+# Copy the crash library to the build directory
+if(WIN32)
+    add_custom_command(TARGET crash POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:crash>
+        ${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_FILE_NAME:crash>
+    )
+elseif(APPLE)
+    add_custom_command(TARGET crash POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:crash>
+        ${CMAKE_CURRENT_BINARY_DIR}/libcrash.dylib
+    )
+else() # Linux
+    add_custom_command(TARGET crash POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:crash>
+        ${CMAKE_CURRENT_BINARY_DIR}/libcrash.so.2
+    )
+endif()
+
+# Add dsymutil post-build step for macOS
+if(APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_custom_command(TARGET MyCMakeCrasher POST_BUILD
+    COMMAND dsymutil $<TARGET_FILE:MyCMakeCrasher>
+    COMMENT "Generating dSYM bundle for MyCMakeCrasher"
+  )
+  
+  add_custom_command(TARGET crash POST_BUILD
+    COMMAND dsymutil $<TARGET_FILE:crash>
+    COMMENT "Generating dSYM bundle for crash library"
+  )
+endif()
+
+# Install targets
+install(TARGETS MyCMakeCrasher DESTINATION bin)
+install(TARGETS crash DESTINATION bin)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/crashpad_handler${CMAKE_EXECUTABLE_SUFFIX} DESTINATION bin)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/attachment.txt DESTINATION bin)
+
+# Symbol upload target - updated to use platform-specific scripts
+if(BUGSPLAT_CLIENT_ID AND BUGSPLAT_CLIENT_SECRET)
+  if(WIN32)
+    add_custom_target(upload_symbols
+      COMMAND powershell -ExecutionPolicy Bypass -File 
+              ${CMAKE_CURRENT_SOURCE_DIR}/scripts/symbol_upload_windows.ps1
+              -database ${BUGSPLAT_DATABASE}
+              -appName ${BUGSPLAT_APP_NAME}
+              -version ${BUGSPLAT_APP_VERSION}
+              -symbolsDir ${CMAKE_CURRENT_BINARY_DIR}
+              -clientId ${BUGSPLAT_CLIENT_ID}
+              -clientSecret ${BUGSPLAT_CLIENT_SECRET}
+      DEPENDS MyCMakeCrasher
+      COMMENT "Uploading symbols to BugSplat using symbol-upload-windows"
+    )
+  elseif(APPLE)
+    add_custom_target(upload_symbols
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/symbol_upload_macos.sh
+              ${BUGSPLAT_DATABASE}
+              ${BUGSPLAT_APP_NAME}
+              ${BUGSPLAT_APP_VERSION}
+              ${CMAKE_CURRENT_BINARY_DIR}
+              ${BUGSPLAT_CLIENT_ID}
+              ${BUGSPLAT_CLIENT_SECRET}
+      DEPENDS MyCMakeCrasher
+      COMMENT "Uploading symbols to BugSplat using symbol-upload-macos"
+    )
+  else() # Linux
+    add_custom_target(upload_symbols
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/symbol_upload_linux.sh
+              ${BUGSPLAT_DATABASE}
+              ${BUGSPLAT_APP_NAME}
+              ${BUGSPLAT_APP_VERSION}
+              ${CMAKE_CURRENT_BINARY_DIR}
+              ${BUGSPLAT_CLIENT_ID}
+              ${BUGSPLAT_CLIENT_SECRET}
+      DEPENDS MyCMakeCrasher
+      COMMENT "Uploading symbols to BugSplat using symbol-upload-linux"
+    )
+  endif()
+endif() 

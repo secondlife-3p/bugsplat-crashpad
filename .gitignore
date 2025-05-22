@@ -28,3 +28,14 @@ cmake-build-*/
 *.exe
 *.out
 *.app 
+
+# Crashpad
+third_party/**/*
+crashes
+
+# Environment files with sensitive data
+.env
+.env.*
+
+# Symbol uploader
+tools
