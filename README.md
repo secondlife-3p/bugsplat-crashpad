@@ -81,7 +81,7 @@ The build scripts will automatically fetch and build Crashpad using depot_tools,
 
 ## Testing Crash Reporting
 
-The application is set up to crash when you press Enter. The crash reports will be stored in the `crashes` directory where you run the application.
+The application will crash immediately upon launch to demonstrate the crash reporting functionality. The crash reports will be stored in the `crashes` directory where you run the application.
 
 ## Project Structure
 

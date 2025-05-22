@@ -221,9 +221,7 @@ int main() {
 
     std::cout << "Hello, World!" << std::endl;
     std::cout << "Crashpad initialized successfully!" << std::endl;
-    std::cout << "Press Enter to crash the program..." << std::endl;
-    
-    std::cin.get();
+    std::cout << "Generating crash..." << std::endl;
     
     // Generate an example callstack and crash
     generateExampleCallstackAndCrash();
