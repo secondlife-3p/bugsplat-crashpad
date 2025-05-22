@@ -27,9 +27,7 @@ This project demonstrates how to:
 
 - CMake (version 3.10 or higher)
 - A C++ compiler (gcc, clang, MSVC, etc.)
-- [depot_tools](https://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html#_setting_up) - Google's tools for working with Chromium source code
-- Ninja - part of depot_tools
-- GN (Generate Ninja) - part of depot_tools
+- Install [depot_tools](https://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html#_setting_up) - Google's tools for working with Chromium source code
 - A BugSplat account and database (sign up at [bugsplat.com](https://www.bugsplat.com))
 
 ## Configuration ⚙️
@@ -72,9 +70,18 @@ $env:Path += ";C:\path\to\depot_tools"
 gclient
 ```
 
+### Symbol Uploads
+
+Symbol uploads must be configured so that crash reports contain function names, file names, and line numbers. The symbol upload process uses BugSplat's [symbol-upload](https://github.com/BugSplat-Git/symbol-upload) utility, which is automatically downloaded as needed. On Windows, symbol-upload-windows.exe will search for `.pdb` files, on macOS  symbol-upload-macos will search for `.dSYM` files, and on Linux, symbol-upload-linux will search for `.debug` files. All files are automatically converted to Crashpad/Breakpad compatible `.sym` files before uploading.
+
+To configure symbol upload, ensure you have:
+
+1. Defined your BugSplat database name in `main.h` as described in the [BugSplat Setup](#bugsplat-setup) section
+2. Set up your BugSplat API credentials (`BUGSPLAT_CLIENT_ID` and `BUGSPLAT_CLIENT_SECRET`) in the `.env` file. You can generate a Client ID/Client Secret pair on the [Integrations](https://app.bugsplat.com/v2/database/integrations#oauth) page.
+
 ## Building the Project 🏗️
 
-The build scripts will automatically fetch and build Crashpad using depot_tools, then build the main application using CMake.
+The build scripts will automatically fetch and build Crashpad using `depot_tools`, then build the main application using CMake.
 
 ### macOS
 
@@ -108,61 +115,12 @@ The build scripts will automatically fetch and build Crashpad using depot_tools,
 
 ## Testing Crash Reporting 🧪
 
-The application will crash immediately upon launch to demonstrate the crash reporting functionality. The crash reports will be stored in the `crashes` directory where you run the application.
+The application will crash immediately upon launch to demonstrate the crash reporting functionality. Crashes will be automatically uploaded to BugSplat. To view crashes, navigate to the [Dashboard](https://app.bugsplat.com/v2/dashboard) page and ensure the correct database is selected.
 
-## Project Structure 🗺️
+<img width="1728" alt="BugSplat Dashboard" src="https://github.com/user-attachments/assets/36572a23-991d-416b-8bdb-bb3627c803cb" />
 
-- `main.cpp`: Main source file with Crashpad integration
-- `main.h`: Header file with configuration defines
-- `crash.cpp` and `crash.h`: Dynamic library that causes a crash
-- `CMakeLists.txt`: CMake configuration file
-- `scripts/`: Build scripts for different platforms
-  - `build_macos.sh`: macOS build script
-  - `build_linux.sh`: Linux build script
-  - `build_windows_msvc.ps1`: Windows build script for MSVC
-  - `build_crashpad_macos.sh`: Script to fetch and build Crashpad on macOS
-  - `build_crashpad_linux.sh`: Script to fetch and build Crashpad on Linux
-  - `build_crashpad_windows_msvc.ps1`: Script to fetch and build Crashpad on Windows
-  - `upload_symbols.sh`: Symbol upload script for macOS/Linux
-  - `upload_symbols.ps1`: Symbol upload script for Windows
-- `third_party/`: Directory where Crashpad will be fetched and built 
+Click the value in the `ID` column to see the report's stack trace and associated metadata.
 
-## Symbol Uploads 📤
+<img width="1728" alt="image" src="https://github.com/user-attachments/assets/da7bfbbb-7340-46ad-8d33-5e6ef03052e7" />
 
-This project supports uploading debug symbols to BugSplat for improved crash reporting. The symbol upload process uses the official BugSplat symbol-upload utility, which is automatically downloaded as needed.
-
-> **Note:** Before uploading symbols, ensure you have:
-> 1. Configured your BugSplat database name in `main.h` as described in the [BugSplat Setup](#bugsplat-setup) section
-> 2. Set up your BugSplat API credentials (`BUGSPLAT_CLIENT_ID` and `BUGSPLAT_CLIENT_SECRET`) in the `.env` file. You can find these in your BugSplat account settings under "API Keys"
-
-### Using the Symbol Upload Scripts
-
-1. Copy `env.example` to `.env` and add your BugSplat credentials:
-   ```
-   BUGSPLAT_CLIENT_ID=your-client-id-here
-   BUGSPLAT_CLIENT_SECRET=your-client-secret-here
-   ```
-
-2. Run the appropriate script for your platform:
-   ```bash
-   # For Linux/macOS
-   ./scripts/upload_symbols.sh
-   ```
-   ```powershell
-   # For Windows
-   .\scripts\upload_symbols.ps1
-   ```
-
-### How It Works
-
-- The scripts will automatically download the appropriate symbol-upload utility for your platform from BugSplat
-- Windows: Uses symbol-upload-windows.exe for uploading `**/*.pdb` files
-- macOS: Uses symbol-upload-macos for uploading `**/*.dSYM` files
-- Linux: Uses symbol-upload-linux for uploading `**/*.debug` files
-
-### Notes on Symbol Uploads
-
-- The symbol upload feature uses the values defined in `main.h` for database, application name, and version
-- Symbol files are platform-specific (.pdb for Windows, .dSYM for macOS, and .debug for Linux)
-- Upload will be skipped if credentials are not provided
-- Credentials are never stored in your source code
+Thanks for using BugSplat!
