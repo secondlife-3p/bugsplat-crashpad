@@ -8,10 +8,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Set output directories to mimic multi-config generators for single-config generators
+# This ensures Linux and macOS builds create Debug/Release folders like Windows
+get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT IS_MULTICONFIG)
+    # For single-config generators, set the output directories to include config name
+    if(NOT CMAKE_BUILD_TYPE)
+        set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type" FORCE)
+    endif()
+    
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
+endif()
+
 # Ensure debug symbols are generated
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Debug symbol flags for all platforms
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+  if(NOT MSVC)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
+  endif()
   
   # Platform-specific debug symbol settings
   if(MSVC)
@@ -45,14 +61,6 @@ else()
   set(BUGSPLAT_CLIENT_SECRET "" CACHE STRING "BugSplat client secret")
 endif()
 
-# Print configuration status for clarity
-message(STATUS "Building ${BUGSPLAT_APP_NAME} version ${BUGSPLAT_APP_VERSION} for database ${BUGSPLAT_DATABASE}")
-if(BUGSPLAT_CLIENT_ID AND BUGSPLAT_CLIENT_SECRET)
-  message(STATUS "BugSplat credentials found - symbol upload available")
-else()
-  message(STATUS "BugSplat credentials not found - symbol upload will be disabled")
-endif()
-
 # Set Crashpad paths
 set(CRASHPAD_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/crashpad)
 
@@ -75,7 +83,7 @@ include_directories(
 if(WIN32)
     set(CRASHPAD_LIBRARIES
         ${CRASHPAD_OUT_DIR}/obj/client/client.lib
-        ${CRASHPAD_OUT_DIR}/obj/client/libcommon.lib
+        ${CRASHPAD_OUT_DIR}/obj/client/common.lib
         ${CRASHPAD_OUT_DIR}/obj/util/util.lib
         ${CRASHPAD_OUT_DIR}/obj/third_party/mini_chromium/mini_chromium/base/base.lib
     )
@@ -142,16 +150,23 @@ else()
     target_link_libraries(MyCMakeCrasher ${CRASHPAD_LIBRARIES})
 endif()
 
+# Set the output config directory variable
+if(IS_MULTICONFIG)
+    set(OUTPUT_CONFIG_DIR $<CONFIG>)
+else()
+    set(OUTPUT_CONFIG_DIR ${CMAKE_BUILD_TYPE})
+endif()
+
 # Copy crashpad_handler to the build directory
 add_custom_command(TARGET MyCMakeCrasher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
     ${CRASHPAD_HANDLER}
-    ${CMAKE_CURRENT_BINARY_DIR}/crashpad_handler${CMAKE_EXECUTABLE_SUFFIX}
+    ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/crashpad_handler${CMAKE_EXECUTABLE_SUFFIX}
 )
 
 # Create attachment.txt in the build directory
 add_custom_command(TARGET MyCMakeCrasher POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "BugSplat rocks!" > ${CMAKE_CURRENT_BINARY_DIR}/attachment.txt
+    COMMAND ${CMAKE_COMMAND} -E echo "BugSplat rocks!" > ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/attachment.txt
 )
 
 # Copy the crash library to the build directory
@@ -159,61 +174,77 @@ if(WIN32)
     add_custom_command(TARGET crash POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:crash>
-        ${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_FILE_NAME:crash>
+        ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/$<TARGET_FILE_NAME:crash>
     )
 elseif(APPLE)
     add_custom_command(TARGET crash POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:crash>
-        ${CMAKE_CURRENT_BINARY_DIR}/libcrash.dylib
+        ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/libcrash.dylib
     )
 else() # Linux
     add_custom_command(TARGET crash POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
         $<TARGET_FILE:crash>
-        ${CMAKE_CURRENT_BINARY_DIR}/libcrash.so.2
+        ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/libcrash.so.2
     )
 endif()
 
-# Add dsymutil post-build step for macOS
-if(APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_custom_command(TARGET MyCMakeCrasher POST_BUILD
-    COMMAND dsymutil $<TARGET_FILE:MyCMakeCrasher>
-    COMMENT "Generating dSYM bundle for MyCMakeCrasher"
-  )
-  
-  add_custom_command(TARGET crash POST_BUILD
-    COMMAND dsymutil $<TARGET_FILE:crash>
-    COMMENT "Generating dSYM bundle for crash library"
-  )
+# Add platform-specific debug symbol extraction for Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  if(APPLE)
+    # Add dsymutil post-build step for macOS
+    add_custom_command(TARGET MyCMakeCrasher POST_BUILD
+      COMMAND dsymutil $<TARGET_FILE:MyCMakeCrasher>
+      COMMENT "Generating dSYM bundle for MyCMakeCrasher"
+    )
+    
+    add_custom_command(TARGET crash POST_BUILD
+      COMMAND dsymutil $<TARGET_FILE:crash>
+      COMMENT "Generating dSYM bundle for crash library"
+    )
+  elseif(UNIX AND NOT APPLE)
+    # Add objcopy debug symbol extraction for Linux
+    add_custom_command(TARGET MyCMakeCrasher POST_BUILD
+      COMMAND objcopy --only-keep-debug $<TARGET_FILE:MyCMakeCrasher> $<TARGET_FILE:MyCMakeCrasher>.debug
+      COMMAND objcopy --strip-debug $<TARGET_FILE:MyCMakeCrasher>
+      COMMAND objcopy --add-gnu-debuglink=$<TARGET_FILE:MyCMakeCrasher>.debug $<TARGET_FILE:MyCMakeCrasher>
+      COMMENT "Extracting debug symbols for MyCMakeCrasher"
+    )
+    
+    add_custom_command(TARGET crash POST_BUILD
+      COMMAND objcopy --only-keep-debug $<TARGET_FILE:crash> $<TARGET_FILE:crash>.debug
+      COMMAND objcopy --strip-debug $<TARGET_FILE:crash>
+      COMMAND objcopy --add-gnu-debuglink=$<TARGET_FILE:crash>.debug $<TARGET_FILE:crash>
+      COMMENT "Extracting debug symbols for crash library"
+    )
+  endif()
 endif()
 
 # Install targets
 install(TARGETS MyCMakeCrasher DESTINATION bin)
 install(TARGETS crash DESTINATION bin)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/crashpad_handler${CMAKE_EXECUTABLE_SUFFIX} DESTINATION bin)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/attachment.txt DESTINATION bin)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/crashpad_handler${CMAKE_EXECUTABLE_SUFFIX} DESTINATION bin)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_CONFIG_DIR}/attachment.txt DESTINATION bin)
 
 # Symbol upload target - updated to use platform-specific scripts
-if(BUGSPLAT_CLIENT_ID AND BUGSPLAT_CLIENT_SECRET)
-  if(WIN32)
-    add_custom_target(upload_symbols
-      COMMAND powershell -ExecutionPolicy Bypass -File 
-              ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.ps1
-      DEPENDS MyCMakeCrasher
-      COMMENT "Uploading symbols to BugSplat"
-    )
-  elseif(APPLE)
-    add_custom_target(upload_symbols
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.sh
-      DEPENDS MyCMakeCrasher
-      COMMENT "Uploading symbols to BugSplat"
-    )
-  else() # Linux
-    add_custom_target(upload_symbols
-      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.sh
-      DEPENDS MyCMakeCrasher
-      COMMENT "Uploading symbols to BugSplat"
-    )
-  endif()
+if(WIN32)
+  add_custom_target(upload_symbols ALL
+    COMMAND powershell -ExecutionPolicy Bypass -File 
+            ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.ps1
+    DEPENDS MyCMakeCrasher crash
+    COMMENT "Uploading symbols to BugSplat"
+  )
+elseif(APPLE)
+  add_custom_target(upload_symbols ALL
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.sh
+    DEPENDS MyCMakeCrasher crash
+    COMMENT "Uploading symbols to BugSplat"
+  )
+else() # Linux
+  add_custom_target(upload_symbols ALL
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/upload_symbols.sh
+    DEPENDS MyCMakeCrasher crash
+    COMMENT "Uploading symbols to BugSplat"
+  )
 endif() 

@@ -7,7 +7,7 @@ param(
     [Parameter(Mandatory=$true)][string]$clientSecret
 )
 
-$rootPath = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$rootPath = Split-Path -Parent $PSScriptRoot
 $toolsDir = Join-Path $rootPath "tools\windows"
 $symbolUploader = Join-Path $toolsDir "symbol-upload-windows.exe"
 
@@ -35,7 +35,6 @@ if (-not (Test-Path $symbolUploader)) {
 }
 
 Write-Host "Uploading symbols from $symbolsDir"
-Write-Host "Command: $symbolUploader -b $database -a $appName -v $version -d $symbolsDir -f '**/*.pdb' -i $clientId -s $clientSecret -m"
 
 & $symbolUploader -b $database -a $appName -v $version -d $symbolsDir -f "**/*.pdb" -i $clientId -s $clientSecret -m
 

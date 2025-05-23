@@ -6,6 +6,12 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <dlfcn.h>
+#include <unistd.h>
+#include <string.h>
+#include <climits>
 #else
 #include <dlfcn.h>
 #include <unistd.h>
@@ -34,7 +40,16 @@ std::string getExecutableDir() {
     }
     return "";
 #elif defined(__APPLE__)
-    return std::filesystem::current_path().string();
+    char path[PATH_MAX];
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) == 0) {
+        std::string pathStr(path);
+        size_t lastSlash = pathStr.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            return pathStr.substr(0, lastSlash);
+        }
+    }
+    return "";
 #else // Linux
     char pBuf[FILENAME_MAX];
     int len = sizeof(pBuf);
@@ -61,14 +76,19 @@ bool initializeCrashpad(std::string dbName, std::string appName, std::string app
 
     // Ensure that crashpad_handler is shipped with your application
 #ifdef _WIN32
-    base::FilePath handler(exeDir + "/crashpad_handler.exe");
+    base::FilePath handler(base::FilePath::StringType(exeDir.begin(), exeDir.end()) + L"/crashpad_handler.exe");
 #else
     base::FilePath handler(exeDir + "/crashpad_handler");
 #endif
 
     // Directory where reports and metrics will be saved
+#ifdef _WIN32
+    base::FilePath reportsDir(base::FilePath::StringType(exeDir.begin(), exeDir.end()));
+    base::FilePath metricsDir(base::FilePath::StringType(exeDir.begin(), exeDir.end()));
+#else
     base::FilePath reportsDir(exeDir);
     base::FilePath metricsDir(exeDir);
+#endif
 
     // Configure url with your BugSplat database
     std::string url = "https://" + dbName + ".bugsplat.com/post/bp/crash/crashpad.php";
@@ -89,7 +109,11 @@ bool initializeCrashpad(std::string dbName, std::string appName, std::string app
 
     // File paths of attachments to be uploaded with the minidump file at crash time
     std::vector<base::FilePath> attachments;
+#ifdef _WIN32
+    base::FilePath attachment(base::FilePath::StringType(exeDir.begin(), exeDir.end()) + L"/attachment.txt");
+#else
     base::FilePath attachment(exeDir + "/attachment.txt");
+#endif
     attachments.push_back(attachment);
 
     // Initialize Crashpad database
