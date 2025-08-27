@@ -180,7 +180,26 @@ bool initializeCrashpad(std::string dbName, std::string appName, std::string app
     );
 
 #ifdef _WIN32
-    // Set up WER integration if Crashpad initialization was successful
+    // Set up Windows Error Reporting (WER) integration if Crashpad initialization was successful.
+    //
+    // REGISTRY REQUIREMENT:
+    // WER integration requires a specific registry configuration in:
+    //   HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules
+    //
+    // IMPORTANT: Creating registry values in HKEY_LOCAL_MACHINE requires elevated privileges.
+    //            This configuration should typically be created by your installer or setup process.
+    // 
+    // You must create a DWORD registry VALUE with:
+    //   Name: [full_path_to_crashpad_wer.dll]
+    //   Type: REG_DWORD
+    //   Data: 0 (value contents are ignored by WER)
+    //
+    // Example registry value:
+    //   Name: "C:\MyApp\bugsplat-crashpad\build\Debug\crashpad_wer.dll"
+    //   Type: REG_DWORD
+    //   Data: 0x00000000 (0)
+    //
+    // This configuration allows WER to delegate crash handling to your Crashpad handler.
     if (success) {
         setupWerIntegration(client, exeDir);
     }
