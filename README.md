@@ -92,7 +92,7 @@ The build scripts will automatically fetch and build Crashpad using `depot_tools
 ./scripts/build_macos.sh
 
 # Run the application
-./build/MyCMakeCrasher
+./build/Debug/MyCMakeCrasher
 ```
 
 ### Linux
@@ -102,7 +102,7 @@ The build scripts will automatically fetch and build Crashpad using `depot_tools
 ./scripts/build_linux.sh
 
 # Run the application
-./build/MyCMakeCrasher
+./build/Debug/MyCMakeCrasher
 ```
 
 ### Windows
