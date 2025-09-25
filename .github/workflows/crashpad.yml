@@ -23,6 +23,10 @@ jobs:
             platform: linux
             script: scripts/build_crashpad_linux.sh
             artifact_path: third_party/crashpad/out/linux-debug
+          - os: ubuntu-24.04-arm 
+            platform: linux-arm64
+            script: scripts/build_crashpad_linux.sh
+            artifact_path: third_party/crashpad/out/linux-arm64-debug
 
     runs-on: ${{ matrix.os }}
     name: Build Crashpad on ${{ matrix.platform }}
@@ -60,7 +64,7 @@ jobs:
           gclient
 
       - name: Install build dependencies (Linux)
-        if: ${{ matrix.platform == 'linux' }}
+        if: ${{ matrix.platform == 'linux' || matrix.platform == 'linux-arm64' }}
         shell: bash
         run: |
           sudo apt-get update
