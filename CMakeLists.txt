@@ -70,7 +70,12 @@ if(WIN32)
 elseif(APPLE)
     set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/macos-debug)
 elseif(UNIX)
-    set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/linux-debug)
+    # Detect if we're building for ARM64
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$" OR CMAKE_TARGET_ARCHITECTURE STREQUAL "ARM64")
+        set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/linux-arm64-debug)
+    else()
+        set(CRASHPAD_OUT_DIR ${CRASHPAD_ROOT}/out/linux-debug)
+    endif()
 endif()
 
 # Add Crashpad include directories

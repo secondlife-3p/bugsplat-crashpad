@@ -23,6 +23,10 @@ jobs:
             platform: linux
             script: scripts/build_crashpad_linux.sh
             artifact_path: third_party/crashpad/out/linux-debug
+          - os: ubuntu-latest
+            platform: linux-arm64
+            script: scripts/build_crashpad_linux_arm64.sh
+            artifact_path: third_party/crashpad/out/linux-arm64-debug
 
     runs-on: ${{ matrix.os }}
     name: Build Crashpad on ${{ matrix.platform }}
@@ -66,6 +70,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libcurl4-openssl-dev
 
+      - name: Install build dependencies (Linux ARM64)
+        if: ${{ matrix.platform == 'linux-arm64' }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcurl4-openssl-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
       - name: Install build dependencies (macOS)
         if: ${{ matrix.platform == 'macos' }}
         shell: bash
@@ -83,6 +94,13 @@ jobs:
         if: ${{ matrix.platform != 'windows' }}
         shell: bash
         run: |
+          # Set up cross-compilation environment for ARM64 Linux builds
+          if [ "${{ matrix.platform }}" == "linux-arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+            export AR=aarch64-linux-gnu-ar
+            export STRIP=aarch64-linux-gnu-strip
+          fi
           chmod +x ${{ matrix.script }}
           ${{ matrix.script }}
 
@@ -107,7 +125,10 @@ jobs:
           elif [ "${{ matrix.platform }}" == "macos" ]; then
             DEBUG_OUT_DIR="third_party/crashpad/out/macos-debug"
             RELEASE_OUT_DIR="third_party/crashpad/out/macos-release"
-          else # Linux
+          elif [ "${{ matrix.platform }}" == "linux-arm64" ]; then
+            DEBUG_OUT_DIR="third_party/crashpad/out/linux-arm64-debug"
+            RELEASE_OUT_DIR="third_party/crashpad/out/linux-arm64-release"
+          else # Linux x86_64
             DEBUG_OUT_DIR="third_party/crashpad/out/linux-debug"
             RELEASE_OUT_DIR="third_party/crashpad/out/linux-release"
           fi
@@ -139,6 +160,19 @@ jobs:
             cp "$RELEASE_OUT_DIR/obj/client/libcommon.a" artifacts/${{ matrix.platform }}/release/lib/
             cp "$RELEASE_OUT_DIR/obj/util/libutil.a" artifacts/${{ matrix.platform }}/release/lib/
             cp "$RELEASE_OUT_DIR/obj/util/libmig_output.a" artifacts/${{ matrix.platform }}/release/lib/
+            cp "$RELEASE_OUT_DIR/obj/third_party/mini_chromium/mini_chromium/base/libbase.a" artifacts/${{ matrix.platform }}/release/lib/
+            cp "$RELEASE_OUT_DIR/crashpad_handler" artifacts/${{ matrix.platform }}/release/bin/
+          elif [ "${{ matrix.platform }}" == "linux-arm64" ]; then
+            # Linux ARM64 debug libraries
+            cp "$DEBUG_OUT_DIR/obj/client/libclient.a" artifacts/${{ matrix.platform }}/debug/lib/
+            cp "$DEBUG_OUT_DIR/obj/client/libcommon.a" artifacts/${{ matrix.platform }}/debug/lib/
+            cp "$DEBUG_OUT_DIR/obj/util/libutil.a" artifacts/${{ matrix.platform }}/debug/lib/
+            cp "$DEBUG_OUT_DIR/obj/third_party/mini_chromium/mini_chromium/base/libbase.a" artifacts/${{ matrix.platform }}/debug/lib/
+            cp "$DEBUG_OUT_DIR/crashpad_handler" artifacts/${{ matrix.platform }}/debug/bin/
+            # Linux ARM64 release libraries
+            cp "$RELEASE_OUT_DIR/obj/client/libclient.a" artifacts/${{ matrix.platform }}/release/lib/
+            cp "$RELEASE_OUT_DIR/obj/client/libcommon.a" artifacts/${{ matrix.platform }}/release/lib/
+            cp "$RELEASE_OUT_DIR/obj/util/libutil.a" artifacts/${{ matrix.platform }}/release/lib/
             cp "$RELEASE_OUT_DIR/obj/third_party/mini_chromium/mini_chromium/base/libbase.a" artifacts/${{ matrix.platform }}/release/lib/
             cp "$RELEASE_OUT_DIR/crashpad_handler" artifacts/${{ matrix.platform }}/release/bin/
           else # Linux
@@ -259,7 +293,8 @@ jobs:
             ### Platforms Included
             - **Windows**: MSVC-compatible `.lib` files + `crashpad_handler.exe`
             - **macOS**: Universal `.a` files + `crashpad_handler`
-            - **Linux**: GCC-compatible `.a` files + `crashpad_handler`
+            - **Linux x86_64**: GCC-compatible `.a` files + `crashpad_handler`
+            - **Linux ARM64**: GCC-compatible `.a` files + `crashpad_handler` (cross-compiled)
             
             ### Directory Structure
             ```

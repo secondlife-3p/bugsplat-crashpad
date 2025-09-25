@@ -97,12 +97,25 @@ The build scripts will automatically fetch and build Crashpad using `depot_tools
 
 ### Linux
 
+**x86_64:**
 ```bash
 # Execute the build script
 ./scripts/build_linux.sh
 
 # Run the application
 ./build/Debug/MyCMakeCrasher
+```
+
+**ARM64 (requires cross-compilation toolchain):**
+```bash
+# Install ARM64 cross-compilation tools (Ubuntu/Debian)
+sudo apt-get install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+# Execute the ARM64 build script
+./scripts/build_linux_arm64.sh
+
+# Transfer and run on ARM64 system
+./build-arm64/Debug/MyCMakeCrasher
 ```
 
 ### Windows
